@@ -1,0 +1,8 @@
+easyocr
+mss
+numpy
+Pillow
+pyautogui
+PyGetWindow
+pynput
+torch
