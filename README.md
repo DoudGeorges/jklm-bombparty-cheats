@@ -8,6 +8,7 @@ An intelligent auto-typer built for the [jklm.fun BombParty](https://jklm.fun/) 
 - **Dictionary Optimization Engine**: A specialized scoring model selects candidate words. This engine optimizes clearing unused alphabet letters while balancing for acceptable word lengths.
 - **Multilingual Support**: Operations are actively supported across four languages: English, French, German, and Spanish.
 - **Human-Like Character Input**: To simulate a natural typing cadence, the bot introduces variance within configured Words Per Minute (WPM) bounds, calculates keyboard layout transition delays, and organically injects (and auto-corrects) common typographical errors.
+- **Resilient Fallbacks**: If the vocabulary is exhausted mid-turn, the bot autonomously detects the unplayable state and gracefully triggers a lobby "/suicide" command to yield the turn immediately.
 - **Turbo Mode**: An optional, zero-delay configuration that bypasses all simulated timing restraints, forcing keystrokes at the absolute maximum speed permissible by the operating system.
 
 ## Setup Requirements
@@ -20,9 +21,9 @@ Python 3.12+ is required. Deploying within a dedicated virtual environment is st
    cd jklm-bombparty-cheats
    ```
 
-2. Install dependencies:
+2. Install dependencies (`uv` is recommended for lightning-fast environment resolution):
    ```bash
-   pip install -r requirements.txt
+   uv pip install -r requirements.txt
    ```
 
 Note: The optical character recognition engine utilizes [PyTorch](https://pytorch.org/). If the host machine runs an NVIDIA GPU, verify that the active Python environment is properly configured for CUDA compatibility to minimize CPU overhead.

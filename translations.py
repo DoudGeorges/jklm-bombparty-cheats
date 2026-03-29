@@ -6,7 +6,6 @@ from dataclasses import dataclass
 
 __all__ = ["LANGUAGES", "Messages", "get_messages", "resolve_language"]
 
-# Supported languages: code → display name.
 LANGUAGES: dict[str, str] = {
     "en": "English",
     "fr": "Français",
@@ -14,48 +13,38 @@ LANGUAGES: dict[str, str] = {
     "es": "Español",
 }
 
-# Reverse lookup: lowercase name → code.
-# Includes native names, English names, accent-stripped variants,
-# and common alternate names.
-_NAME_TO_CODE: dict[str, str] = {
-    name.lower(): code for code, name in LANGUAGES.items()
-}
-_NAME_TO_CODE.update({
-    # English names
-    "english": "en",
-    "french": "fr",
-    "german": "de",
-    "spanish": "es",
-    # Accent-stripped native names
-    "francais": "fr",
-    "espanol": "es",
-    # ISO 639-2 three-letter codes
-    "eng": "en",
-    "fra": "fr",
-    "fre": "fr",
-    "deu": "de",
-    "ger": "de",
-    "spa": "es",
-    # French names for languages
-    "anglais": "en",
-    "allemand": "de",
-    "espagnol": "es",
-    # German names for languages
-    "englisch": "en",
-    "französisch": "fr",
-    "franzosisch": "fr",
-    "spanisch": "es",
-    # Spanish names for languages
-    "inglés": "en",
-    "ingles": "en",
-    "francés": "fr",
-    "frances": "fr",
-    "alemán": "de",
-    "aleman": "de",
-    "castellano": "es",
-    # Common misspellings
-    "deutch": "de",
-})
+_NAME_TO_CODE: dict[str, str] = {name.lower(): code for code, name in LANGUAGES.items()}
+_NAME_TO_CODE.update(
+    {
+        "english": "en",
+        "french": "fr",
+        "german": "de",
+        "spanish": "es",
+        "francais": "fr",
+        "espanol": "es",
+        "eng": "en",
+        "fra": "fr",
+        "fre": "fr",
+        "deu": "de",
+        "ger": "de",
+        "spa": "es",
+        "anglais": "en",
+        "allemand": "de",
+        "espagnol": "es",
+        "englisch": "en",
+        "französisch": "fr",
+        "franzosisch": "fr",
+        "spanisch": "es",
+        "inglés": "en",
+        "ingles": "en",
+        "francés": "fr",
+        "frances": "fr",
+        "alemán": "de",
+        "aleman": "de",
+        "castellano": "es",
+        "deutch": "de",
+    }
+)
 
 
 def _strip_accents(text: str) -> str:
@@ -83,12 +72,8 @@ def resolve_language(value: str) -> str:
     stripped = _strip_accents(lower)
     if stripped in _NAME_TO_CODE:
         return _NAME_TO_CODE[stripped]
-    supported = ", ".join(
-        f"{code} ({name})" for code, name in LANGUAGES.items()
-    )
-    raise ValueError(
-        f"Unknown language: {value!r}. Supported: {supported}"
-    )
+    supported = ", ".join(f"{code} ({name})" for code, name in LANGUAGES.items())
+    raise ValueError(f"Unknown language: {value!r}. Supported: {supported}")
 
 
 @dataclass(slots=True, frozen=True)
@@ -108,6 +93,7 @@ class Messages:
     no_match: str
     played_for: str
     rejected_for: str
+    gave_up: str
     exiting: str
 
 
@@ -115,7 +101,7 @@ _MESSAGES: dict[str, Messages] = {
     "en": Messages(
         loaded_words="Loaded {count} words",
         press_to_toggle="Press {key} to toggle",
-        enabled_on="Enabled on {title} ({size})",
+        enabled_on="Enabled",
         error="Error: {detail}",
         disabled="Disabled",
         paused="Paused",
@@ -126,12 +112,13 @@ _MESSAGES: dict[str, Messages] = {
         no_match="No match for {syllable}",
         played_for="Played {word} for {syllable}",
         rejected_for="Rejected {word} for {syllable}",
+        gave_up="Gave up on {syllable}",
         exiting="Exiting",
     ),
     "fr": Messages(
         loaded_words="{count} mots chargés",
         press_to_toggle="Appuyez sur {key} pour activer",
-        enabled_on="Activé sur {title} ({size})",
+        enabled_on="Activé",
         error="Erreur : {detail}",
         disabled="Désactivé",
         paused="En pause",
@@ -142,12 +129,13 @@ _MESSAGES: dict[str, Messages] = {
         no_match="Aucun mot pour {syllable}",
         played_for="Joué {word} pour {syllable}",
         rejected_for="Refusé {word} pour {syllable}",
+        gave_up="Abandonné sur {syllable}",
         exiting="Fermeture",
     ),
     "de": Messages(
         loaded_words="{count} Wörter geladen",
         press_to_toggle="{key} zum Umschalten drücken",
-        enabled_on="Aktiviert auf {title} ({size})",
+        enabled_on="Aktiviert",
         error="Fehler: {detail}",
         disabled="Deaktiviert",
         paused="Pausiert",
@@ -158,12 +146,13 @@ _MESSAGES: dict[str, Messages] = {
         no_match="Kein Treffer für {syllable}",
         played_for="Gespielt {word} für {syllable}",
         rejected_for="Abgelehnt {word} für {syllable}",
+        gave_up="Aufgegeben bei {syllable}",
         exiting="Beenden",
     ),
     "es": Messages(
         loaded_words="{count} palabras cargadas",
         press_to_toggle="Pulsa {key} para activar",
-        enabled_on="Activado en {title} ({size})",
+        enabled_on="Activado",
         error="Error: {detail}",
         disabled="Desactivado",
         paused="En pausa",
@@ -174,6 +163,7 @@ _MESSAGES: dict[str, Messages] = {
         no_match="Sin coincidencia para {syllable}",
         played_for="Jugado {word} para {syllable}",
         rejected_for="Rechazado {word} para {syllable}",
+        gave_up="Rendido en {syllable}",
         exiting="Saliendo",
     ),
 }

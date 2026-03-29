@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import math
-from collections import defaultdict
+import random
+from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Final
 
@@ -18,6 +19,22 @@ _W_UNUSED: Final[float] = 5.0
 _W_RARITY: Final[float] = 3.0
 _W_EFFICIENCY: Final[float] = 8.0
 _W_LENGTH: Final[float] = 0.5
+_W_ANCHOR: Final[float] = 4.0
+_W_AFFIX: Final[float] = 1.5
+
+_COMMON_AFFIXES: Final[tuple[str, ...]] = (
+    "ing",
+    "ed",
+    "tion",
+    "ly",
+    "ness",
+    "ment",
+    "ers",
+    "ous",
+    "ist",
+    "able",
+    "ive",
+)
 
 # When remaining life letters drop to this threshold or below, the urgency
 # multiplier kicks in to aggressively target those specific letters.
@@ -25,30 +42,21 @@ _LIFE_URGENCY_THRESHOLD: Final[int] = 5
 
 
 class WordIndex:
-    """Pre-built substring index for O(1) candidate lookup.
-
-    Computes per-letter scarcity weights from the loaded dictionary
-    so the scoring algorithm can prioritise clearing rare letters.
-    """
+    """Pre-built substring index for O(1) candidate lookup."""
 
     __slots__ = ("_index", "_words", "_letter_rarity")
 
     def __init__(self, words: list[str]) -> None:
         self._words = words
         self._index: dict[str, set[str]] = defaultdict(set)
-        letter_word_counts: dict[str, int] = defaultdict(int)
+        letter_word_counts = Counter(ch for word in words for ch in set(word))
 
         for word in words:
             wl = len(word)
-            word_chars = set(word)
-            for ch in word_chars:
-                letter_word_counts[ch] += 1
             for sub_len in range(2, min(_MAX_SYLLABLE_LEN, wl) + 1):
                 for start in range(wl - sub_len + 1):
                     self._index[word[start : start + sub_len]].add(word)
 
-        # Rarity = log(total / count).  Letters in fewer words get a
-        # higher weight, incentivising the bot to clear them early.
         total = max(len(words), 1)
         self._letter_rarity: dict[str, float] = {
             ch: math.log(total / max(count, 1))
@@ -101,6 +109,7 @@ def score_and_rank(
     candidates: list[str],
     unused_letters: set[str],
     letter_rarity: dict[str, float] | None = None,
+    syllable: str | None = None,
 ) -> list[str]:
     """Rank candidates using a weighted multi-factor scoring model.
 
@@ -131,8 +140,6 @@ def score_and_rank(
 
     unused_lower = {ch.lower() for ch in unused_letters}
 
-    # Adaptive urgency: as the player gets closer to earning a life, the
-    # per-letter payoff becomes exponentially more valuable.
     life_urgency = 1.0
     if unused_lower:
         remaining = len(unused_lower)
@@ -141,19 +148,30 @@ def score_and_rank(
 
     all_covered = not unused_lower
 
+    is_showoff_turn = random.random() < 0.05
+    optimal_length = random.choice((4.0, 5.0, 6.0, 7.0))
+
+    syllable_lower = syllable.lower() if syllable else None
+
     def _score(word: str) -> float:
         wlen = len(word)
         if wlen == 0:
             return float("-inf")
 
+        jitter = random.uniform(0.0, 1.0)
+
+        base_modifiers = 0.0
+        if syllable_lower and word.startswith(syllable_lower):
+            base_modifiers += _W_ANCHOR
+        if word.endswith(_COMMON_AFFIXES):
+            base_modifiers += _W_AFFIX
+
         word_chars = set(word)
 
         if all_covered:
-            # All letters covered: optimise for speed + reliability.
-            # Bell curve peaks at length 5, falls off for very short
-            # (often invalid) and very long (slow to type) words.
-            ideal_len = 5.0
-            return -((wlen - ideal_len) ** 2) * 0.1
+            if is_showoff_turn:
+                return (wlen * 2.0) + jitter + base_modifiers
+            return -((wlen - optimal_length) ** 2) * 0.1 + jitter + base_modifiers
 
         life_covered = len(word_chars & unused_lower)
         life_score = life_covered * _W_LIFE * life_urgency
@@ -163,15 +181,23 @@ def score_and_rank(
         unused_score = unused_count * _W_UNUSED
 
         if letter_rarity and unused_covered:
-            rarity_sum = sum(
-                letter_rarity.get(ch, 0.0) for ch in unused_covered
-            )
+            rarity_sum = sum(letter_rarity.get(ch, 0.0) for ch in unused_covered)
             unused_score += rarity_sum * _W_RARITY
 
         efficiency_score = (unused_count / wlen) * _W_EFFICIENCY
 
-        length_penalty = math.log1p(wlen) * _W_LENGTH
+        if is_showoff_turn:
+            length_penalty = -(wlen * _W_LENGTH * 2.0)
+        else:
+            length_penalty = math.log1p(wlen) * _W_LENGTH
 
-        return life_score + unused_score + efficiency_score - length_penalty
+        return (
+            life_score
+            + unused_score
+            + efficiency_score
+            - length_penalty
+            + jitter
+            + base_modifiers
+        )
 
     return sorted(candidates, key=_score, reverse=True)

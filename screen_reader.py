@@ -27,8 +27,6 @@ if not _GPU_AVAILABLE:
 
 _ocr_reader: easyocr.Reader | None = None
 
-# Persistent mss instance — avoids creating a new screen-capture handle
-# on every poll cycle.
 _sct: mss.mss | None = None
 
 
@@ -53,26 +51,20 @@ def warmup_ocr() -> None:
     _get_ocr_reader()
 
 
-# Proportional ROIs: (x, y, w, h) relative to game window dimensions.
-SYLLABLE_ROI: Final = (0.375, 0.455, 0.080, 0.145)
-INPUT_ROI: Final = (0.255, 0.925, 0.320, 0.070)
+SYLLABLE_ROI: Final[tuple[float, float, float, float]] = (0.375, 0.455, 0.080, 0.145)
+INPUT_ROI: Final[tuple[float, float, float, float]] = (0.255, 0.925, 0.320, 0.070)
 
-# OCR tuning constants.
-_OCR_CONFIDENCE_MIN: Final = 0.35
-_SYLLABLE_MAX_LEN: Final = 5
-_OCR_ALLOWLIST: Final = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+_OCR_CONFIDENCE_MIN: Final[float] = 0.35
+_SYLLABLE_MAX_LEN: Final[int] = 5
+_OCR_ALLOWLIST: Final[str] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
-# Turn detection: the active input bar is #161312 (RGB 22, 19, 18).
-# Enough pixels within tolerance → turn is active.
-_INPUT_BAR_COLOR: Final = np.array([22, 19, 18], dtype=np.float32)
-_INPUT_COLOR_TOLERANCE: Final = 25
-_INPUT_MATCH_FRACTION: Final = 0.55
+_INPUT_BAR_COLOR: Final[np.ndarray] = np.array([22, 19, 18], dtype=np.float32)
+_INPUT_COLOR_TOLERANCE: Final[int] = 25
+_INPUT_MATCH_FRACTION: Final[float] = 0.05
 
-# Round restart: the green button #26AA36 (RGB 38, 170, 54) appears in
-# the input bar area between rounds.
-_RESTART_COLOR: Final = np.array([38, 170, 54], dtype=np.float32)
-_RESTART_COLOR_TOLERANCE: Final = 50
-_RESTART_MATCH_FRACTION: Final = 0.02
+_RESTART_COLOR: Final[np.ndarray] = np.array([38, 170, 54], dtype=np.float32)
+_RESTART_COLOR_TOLERANCE: Final[int] = 50
+_RESTART_MATCH_FRACTION: Final[float] = 0.02
 
 
 def _capture_game_region(region: tuple[int, int, int, int]) -> Image.Image:
@@ -109,12 +101,16 @@ def capture_input_roi(region: tuple[int, int, int, int]) -> np.ndarray:
     )
     # Convert BGRA → RGB via numpy slicing (faster than PIL conversion).
     bgra = np.frombuffer(screenshot.bgra, dtype=np.uint8).reshape(
-        screenshot.height, screenshot.width, 4,
+        screenshot.height,
+        screenshot.width,
+        4,
     )
     return np.ascontiguousarray(bgra[:, :, 2::-1])
 
 
-def _extract_roi(image: Image.Image, roi: tuple[float, float, float, float]) -> Image.Image:
+def _extract_roi(
+    image: Image.Image, roi: tuple[float, float, float, float]
+) -> Image.Image:
     """Crop a proportional sub-region from an image.
 
     Coordinates are clamped to image bounds to prevent zero-dimension crops.
@@ -133,7 +129,7 @@ def _is_valid_syllable(text: str, confidence: float) -> bool:
     return (
         bool(text)
         and text.isalpha()
-        and len(text) <= _SYLLABLE_MAX_LEN
+        and 2 <= len(text) <= _SYLLABLE_MAX_LEN
         and confidence >= _OCR_CONFIDENCE_MIN
     )
 
@@ -155,11 +151,14 @@ def _read_syllable(
         return None
 
     upscaled = crop.resize(
-        (crop.width * 3, crop.height * 3), Image.LANCZOS,
+        (crop.width * 3, crop.height * 3),
+        Image.LANCZOS,
     )
 
     results = _get_ocr_reader().readtext(
-        np.array(upscaled), allowlist=_OCR_ALLOWLIST, detail=1,
+        np.array(upscaled),
+        allowlist=_OCR_ALLOWLIST,
+        detail=1,
     )
     if not results:
         return None
@@ -173,7 +172,7 @@ def _read_syllable(
 
 def _validate_pixel_array(arr: np.ndarray) -> bool:
     """Check that an array has the expected (H, W, 3) RGB shape."""
-    return bool(arr.ndim == 3 and arr.shape[2] >= 3)
+    return bool(arr.size > 0 and arr.ndim == 3 and arr.shape[2] >= 3)
 
 
 def detect_turn_active_from_array(arr: np.ndarray) -> bool:

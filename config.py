@@ -41,7 +41,9 @@ class BotConfig:
         if wpm_min > wpm_max:
             raise ValueError(f"wpm_min ({wpm_min}) must be <= wpm_max ({wpm_max})")
         if not 0.0 <= self.typo_probability <= 1.0:
-            raise ValueError(f"typo_probability must be in [0, 1], got {self.typo_probability}")
+            raise ValueError(
+                f"typo_probability must be in [0, 1], got {self.typo_probability}"
+            )
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
@@ -52,17 +54,26 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     )
     lang_choices = ", ".join(f"{c} ({n})" for c, n in LANGUAGES.items())
     parser.add_argument(
-        "--language", "-l", type=str, default=None,
+        "--language",
+        "-l",
+        type=str,
+        default=None,
         help=f"Language code or name. Sets wordlist to wordlists/{{code}}.txt. "
-             f"Cannot be used with --wordlist. Choices: {lang_choices}",
+        f"Cannot be used with --wordlist. Choices: {lang_choices}",
     )
     parser.add_argument(
-        "--wordlist", "-w", type=Path, default=None,
+        "--wordlist",
+        "-w",
+        type=Path,
+        default=None,
         help="Path to word list file (default: wordlists/en.txt). "
-             "Cannot be used with --language.",
+        "Cannot be used with --language.",
     )
     parser.add_argument(
-        "--turbo", "-t", action="store_true", default=False,
+        "--turbo",
+        "-t",
+        action="store_true",
+        default=False,
         help="Remove all artificial delays (type as fast as possible)",
     )
     return parser

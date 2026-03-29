@@ -8,13 +8,11 @@ from typing import Final
 
 __all__ = ["GameState", "LIFE_LETTERS_BY_LANG", "get_life_letters"]
 
-# Per-language life-letter sets.  Accented characters are normalised to
-# their base letter by the game, so only a–z matter.
 LIFE_LETTERS_BY_LANG: dict[str, frozenset[str]] = {
-    "en": frozenset("abcdefghijklmnopqrstuvwy"),      # no x, z
-    "fr": frozenset("abcdefghijlmnopqrstuv"),          # no k, w, x, y, z
-    "de": frozenset("abcdefghiklmnoprstuvwz"),          # no j, q, x, y
-    "es": frozenset("abcdefghijlmnopqrstuv"),           # no k, w, x, y, z
+    "en": frozenset("abcdefghijklmnopqrstuvwy"),  # no x, z
+    "fr": frozenset("abcdefghijlmnopqrstuv"),  # no k, w, x, y, z
+    "de": frozenset("abcdefghiklmnoprstuvwz"),  # no j, q, x, y
+    "es": frozenset("abcdefghijlmnopqrstuv"),  # no k, w, x, y, z
 }
 
 _FALLBACK_LETTERS: Final[frozenset[str]] = frozenset("abcdefghijklmnopqrstuvwxyz")
@@ -30,9 +28,6 @@ def get_life_letters(language: str) -> frozenset[str]:
 
 DEFAULT_DEBOUNCE_FRAMES: Final[int] = 2
 
-# Minimum word length for rejected-stem tracking.  When a word at least
-# this long is rejected, all candidates containing it as a substring
-# are blocked for the rest of the round.
 _STEM_MIN_LENGTH: Final[int] = 6
 
 
@@ -40,12 +35,17 @@ _STEM_MIN_LENGTH: Final[int] = 6
 class GameState:
     """Track the current state of a BombParty game."""
 
-    life_letters: frozenset[str] = field(default_factory=lambda: LIFE_LETTERS_BY_LANG["en"])
+    life_letters: frozenset[str] = field(
+        default_factory=lambda: LIFE_LETTERS_BY_LANG["en"]
+    )
 
     current_syllable: str | None = None
     played_words: set[str] = field(default_factory=set)
     is_my_turn: bool = False
     is_active: bool = False
+    autoplay: bool = False
+    successful_plays_count: int = 0
+    human_submitted_word: str | None = None
     candidate_queue: deque[str] = field(default_factory=deque)
 
     debounce_frames: int = DEFAULT_DEBOUNCE_FRAMES
@@ -55,6 +55,7 @@ class GameState:
 
     letters_played_this_round: set[str] = field(default_factory=set)
     _rejected_stems: set[str] = field(default_factory=set)
+    surrendered_turn: bool = False
 
     @property
     def unused_letters(self) -> frozenset[str]:
@@ -80,18 +81,27 @@ class GameState:
         lower = word.lower()
         self.played_words.add(lower)
         self.letters_played_this_round.update(lower)
-        # Life earned: all required letters covered.  Reset for the next cycle.
+        self.successful_plays_count += 1
         if not (self.life_letters - self.letters_played_this_round):
             self.letters_played_this_round.clear()
 
     def mark_word_rejected(self, word: str) -> None:
-        """Exclude a rejected word from future candidates without crediting its letters."""
+        """Exclude a rejected word and its base-root from future candidates."""
         if not word:
             return
         lower = word.lower()
         self.played_words.add(lower)
-        if len(lower) >= _STEM_MIN_LENGTH:
-            self._rejected_stems.add(lower)
+
+        base = lower
+        for sfx in ("ing", "ed", "es", "s", "er", "ers", "ly", "man", "men"):
+            if base.endswith(sfx) and len(base) > len(sfx) + 4:
+                base = base[: -len(sfx)]
+                if len(base) > 2 and base[-1] == base[-2]:
+                    base = base[:-1]
+                break
+
+        if len(base) >= _STEM_MIN_LENGTH:
+            self._rejected_stems.add(base)
 
     def is_blocked(self, word: str) -> bool:
         """Check if a candidate contains a previously rejected stem."""
@@ -106,6 +116,7 @@ class GameState:
         self._prev_is_my_turn = False
         self.turn_just_started = False
         self.is_my_turn = False
+        self.surrendered_turn = False
 
     def reset_round(self) -> None:
         """Reset state for a new round."""
@@ -114,3 +125,5 @@ class GameState:
         self.current_syllable = None
         self.letters_played_this_round.clear()
         self._rejected_stems.clear()
+        self.successful_plays_count = 0
+        self.surrendered_turn = False

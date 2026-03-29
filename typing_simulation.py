@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from config import BotConfig
     from game_state import GameState
 
-# QWERTY keyboard adjacency map for typo simulation.
+# QWERTY adjacent key mappings
 ADJACENCY: Final[dict[str, tuple[str, ...]]] = {
     "a": ("q", "w", "s", "z"),
     "b": ("v", "g", "h", "n"),
@@ -50,10 +50,8 @@ _CHARS_PER_WORD: Final[int] = 5
 _JITTER_SECS: Final[float] = 0.025
 _MIN_DELAY_SECS: Final[float] = 0.01
 
-# Keys reachable by each hand on a standard QWERTY layout.
 _LEFT_HAND: Final[frozenset[str]] = frozenset("qwertasdfgzxcvb")
 
-# Extra delay when consecutive keys require different hands.
 _HAND_TRANSITION_MIN: Final[float] = 0.005
 _HAND_TRANSITION_MAX: Final[float] = 0.020
 
@@ -71,10 +69,8 @@ def _sample_delay(config: BotConfig) -> float:
     mean_wpm = (wpm_min + wpm_max) / 2.0
     std_wpm = (wpm_max - wpm_min) / 4.0
 
-    sampled_wpm = max(wpm_min, min(wpm_max, random.gauss(mean_wpm, std_wpm)))
+    sampled_wpm = max(1.0, min(float(wpm_max), random.gauss(mean_wpm, std_wpm)))
     base_delay = 60.0 / (sampled_wpm * _CHARS_PER_WORD)
-    # Triangular jitter biases toward zero — most keystrokes are close to
-    # the base delay, with occasional slower or faster outliers.
     jitter = random.triangular(-_JITTER_SECS, _JITTER_SECS, 0.0)
     return max(_MIN_DELAY_SECS, base_delay + jitter)
 
@@ -90,13 +86,34 @@ def _hand_transition_delay(prev_char: str | None, cur_char: str) -> float:
     return 0.0
 
 
+def _sleep_with_poll(
+    delay_secs: float, can_continue: Callable[[], bool] | None
+) -> bool:
+    """Sleep with accurate OS-agnostic timing, checking can_continue frequently."""
+    start = time.monotonic()
+    while True:
+        elapsed = time.monotonic() - start
+        remaining = delay_secs - elapsed
+
+        if remaining <= 0:
+            return True
+
+        if can_continue is not None and not can_continue():
+            return False
+
+        if remaining > 0.02:
+            time.sleep(0.015)
+        else:
+            time.sleep(remaining)
+
+
 def _pick_typo_char(correct_char: str) -> str | None:
     """Pick an adjacent key for a realistic typo."""
     adjacent = ADJACENCY.get(correct_char.lower())
     return random.choice(adjacent) if adjacent else None
 
 
-def _inject_adjacent_typo(char: str) -> bool:
+def _inject_adjacent_typo(char: str, can_continue: Callable[[], bool] | None) -> bool:
     """Hit a neighbouring key, notice, backspace, retype."""
     typo_char = _pick_typo_char(char)
     if not typo_char:
@@ -104,27 +121,33 @@ def _inject_adjacent_typo(char: str) -> bool:
 
     _keyboard.press(typo_char)
     _keyboard.release(typo_char)
-    time.sleep(random.uniform(0.200, 0.400))
+    if not _sleep_with_poll(random.uniform(0.200, 0.400), can_continue):
+        return False
 
     _keyboard.press(Key.backspace)
     _keyboard.release(Key.backspace)
-    time.sleep(random.uniform(0.100, 0.200))
+    if not _sleep_with_poll(random.uniform(0.100, 0.200), can_continue):
+        return False
     return True
 
 
-def _inject_double_tap(char: str) -> bool:
+def _inject_double_tap(char: str, can_continue: Callable[[], bool] | None) -> bool:
     """Accidentally press the same key twice, notice, backspace."""
     _keyboard.press(char)
     _keyboard.release(char)
-    time.sleep(random.uniform(0.200, 0.400))
+    if not _sleep_with_poll(random.uniform(0.200, 0.400), can_continue):
+        return False
 
     _keyboard.press(Key.backspace)
     _keyboard.release(Key.backspace)
-    time.sleep(random.uniform(0.100, 0.200))
+    if not _sleep_with_poll(random.uniform(0.100, 0.200), can_continue):
+        return False
     return True
 
 
-def _inject_transposition(char: str, next_char: str) -> bool:
+def _inject_transposition(
+    char: str, next_char: str, can_continue: Callable[[], bool] | None
+) -> bool:
     """Type two characters in the wrong order, then fix.
 
     Types next_char first (wrong), then char, then backspaces both
@@ -136,29 +159,35 @@ def _inject_transposition(char: str, next_char: str) -> bool:
 
     _keyboard.press(next_char)
     _keyboard.release(next_char)
-    time.sleep(random.uniform(0.040, 0.080))
+    if not _sleep_with_poll(random.uniform(0.040, 0.080), can_continue):
+        return False
 
     _keyboard.press(char)
     _keyboard.release(char)
-    time.sleep(random.uniform(0.250, 0.450))
+    if not _sleep_with_poll(random.uniform(0.250, 0.450), can_continue):
+        return False
 
     for _ in range(2):
         _keyboard.press(Key.backspace)
         _keyboard.release(Key.backspace)
-        time.sleep(random.uniform(0.080, 0.150))
+        if not _sleep_with_poll(random.uniform(0.080, 0.150), can_continue):
+            return False
 
-    time.sleep(random.uniform(0.100, 0.200))
+    if not _sleep_with_poll(random.uniform(0.100, 0.200), can_continue):
+        return False
     return True
 
 
-def _try_inject_typo(char: str, next_char: str | None) -> bool:
+def _try_inject_typo(
+    char: str, next_char: str | None, can_continue: Callable[[], bool] | None
+) -> bool:
     """Roll for a typo type and inject it.  Returns True if a typo occurred."""
     roll = random.random()
     if roll < 0.30 and next_char is not None:
-        return _inject_transposition(char, next_char)
+        return _inject_transposition(char, next_char, can_continue)
     if roll < 0.45:
-        return _inject_double_tap(char)
-    return _inject_adjacent_typo(char)
+        return _inject_double_tap(char, can_continue)
+    return _inject_adjacent_typo(char, can_continue)
 
 
 def type_word(
@@ -184,11 +213,20 @@ def type_word(
     if not word:
         return True
 
+    _keyboard.press(Key.ctrl)
+    _keyboard.press("a")
+    _keyboard.release("a")
+    _keyboard.release(Key.ctrl)
+    time.sleep(0.02)
+    _keyboard.press(Key.backspace)
+    _keyboard.release(Key.backspace)
+    time.sleep(0.02)
+
     turbo = config.turbo
     typo_count = 0
     max_typos = 2 if len(word) >= 10 else 1
     burst_counter = 0
-    next_burst_at = random.randint(2, 6)
+    next_burst_at = random.randint(3, 8)
     prev_char: str | None = None
 
     for i, char in enumerate(word):
@@ -197,7 +235,6 @@ def type_word(
         if can_continue is not None and not can_continue():
             return False
 
-        # Typos: never on the first or last character.
         if (
             not turbo
             and config.typo_enabled
@@ -206,7 +243,10 @@ def type_word(
             and random.random() < config.typo_probability
         ):
             next_char = word[i + 1] if i + 1 < len(word) - 1 else None
-            if _try_inject_typo(char, next_char):
+            typo_result = _try_inject_typo(char, next_char, can_continue)
+            if can_continue is not None and not can_continue():
+                return False
+            if typo_result:
                 typo_count += 1
 
         _keyboard.press(char)
@@ -217,10 +257,11 @@ def type_word(
             delay += _hand_transition_delay(prev_char, char)
             burst_counter += 1
             if burst_counter >= next_burst_at:
-                delay += random.uniform(0.040, 0.150)
+                delay += random.uniform(0.030, 0.110)
                 burst_counter = 0
-                next_burst_at = random.randint(2, 6)
-            time.sleep(delay)
+                next_burst_at = random.randint(3, 8)
+            if not _sleep_with_poll(delay, can_continue):
+                return False
 
         prev_char = char
 
@@ -229,8 +270,10 @@ def type_word(
     if can_continue is not None and not can_continue():
         return False
 
-    if not turbo:
-        time.sleep(random.uniform(0.040, 0.120))
+    if not config.turbo:
+        if not _sleep_with_poll(random.uniform(0.030, 0.090), can_continue):
+            return False
+
     _keyboard.press(Key.enter)
     _keyboard.release(Key.enter)
     return True
