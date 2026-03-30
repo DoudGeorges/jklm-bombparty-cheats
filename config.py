@@ -22,28 +22,25 @@ class BotConfig:
 
     language: str = "en"
     wordlist_path: Path = field(default_factory=lambda: _WORDLISTS_DIR / "en.txt")
-    toggle_hotkey: str = "f8"
-    window_title: str = "jklm.fun"
-    typing_wpm_range: tuple[int, int] = (100, 130)
-    typo_enabled: bool = True
-    typo_probability: float = 0.04
+    hotkey: str = "f8"
+    wpm: tuple[int, int] = (100, 130)
+    typo: float = 0.04
+    surrender: float = 0.50
     turbo: bool = False
 
     def __post_init__(self) -> None:
-        if not self.toggle_hotkey:
-            raise ValueError("toggle_hotkey must be a non-empty string")
-        if not self.window_title:
-            raise ValueError("window_title must be a non-empty string")
+        if not self.hotkey:
+            raise ValueError("hotkey must be a non-empty string")
 
-        wpm_min, wpm_max = self.typing_wpm_range
+        wpm_min, wpm_max = self.wpm
         if wpm_min <= 0 or wpm_max <= 0:
             raise ValueError(f"WPM values must be positive, got ({wpm_min}, {wpm_max})")
         if wpm_min > wpm_max:
-            raise ValueError(f"wpm_min ({wpm_min}) must be <= wpm_max ({wpm_max})")
-        if not 0.0 <= self.typo_probability <= 1.0:
-            raise ValueError(
-                f"typo_probability must be in [0, 1], got {self.typo_probability}"
-            )
+            raise ValueError(f"wpm min ({wpm_min}) must be <= max ({wpm_max})")
+        if not 0.0 <= self.typo <= 1.0:
+            raise ValueError(f"typo must be in [0, 1], got {self.typo}")
+        if not 0.0 <= self.surrender <= 1.0:
+            raise ValueError(f"surrender must be in [0, 1], got {self.surrender}")
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
@@ -70,11 +67,42 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         "Cannot be used with --language.",
     )
     parser.add_argument(
+        "--hotkey",
+        "-k",
+        type=str,
+        default=None,
+        metavar="KEY",
+        help="Global toggle hotkey (default: f8)",
+    )
+    parser.add_argument(
+        "--wpm",
+        nargs=2,
+        type=int,
+        default=None,
+        metavar=("MIN", "MAX"),
+        help="WPM range for keystroke timing (default: 100 130)",
+    )
+    parser.add_argument(
+        "--typo",
+        type=float,
+        default=None,
+        metavar="RATE",
+        help="Per-keystroke typo probability 0.0-1.0 (default: 0.04, 0 to disable)",
+    )
+    parser.add_argument(
+        "--surrender",
+        "-s",
+        type=float,
+        default=None,
+        metavar="RATE",
+        help="Probability of /suicide when no word is found 0.0-1.0 (default: 0.5)",
+    )
+    parser.add_argument(
         "--turbo",
         "-t",
         action="store_true",
         default=False,
-        help="Remove all artificial delays (type as fast as possible)",
+        help="Disable all timing simulation (type as fast as possible)",
     )
     return parser
 
@@ -87,22 +115,20 @@ def _apply_json_config(config: BotConfig, data: dict[str, Any]) -> None:
         config.wordlist_path = _WORDLISTS_DIR / f"{code}.txt"
     if "wordlist_path" in data:
         config.wordlist_path = Path(data["wordlist_path"])
-    if "toggle_hotkey" in data:
-        config.toggle_hotkey = str(data["toggle_hotkey"]).lower()
-    if "window_title" in data:
-        config.window_title = str(data["window_title"])
-    if "typing_wpm_range" in data:
-        raw = data["typing_wpm_range"]
+    if "hotkey" in data:
+        config.hotkey = str(data["hotkey"]).lower()
+    if "wpm" in data:
+        raw = data["wpm"]
         if isinstance(raw, list) and len(raw) == 2:
-            config.typing_wpm_range = (int(raw[0]), int(raw[1]))
-    if "typo_enabled" in data:
-        config.typo_enabled = bool(data["typo_enabled"])
-    if "typo_probability" in data:
-        config.typo_probability = float(data["typo_probability"])
+            config.wpm = (int(raw[0]), int(raw[1]))
+    if "typo" in data:
+        config.typo = float(data["typo"])
+    if "surrender" in data:
+        config.surrender = float(data["surrender"])
     if "turbo" in data:
         config.turbo = bool(data["turbo"])
         if config.turbo:
-            config.typo_enabled = False
+            config.typo = 0.0
 
 
 def _apply_cli_args(config: BotConfig, args: argparse.Namespace) -> None:
@@ -116,13 +142,21 @@ def _apply_cli_args(config: BotConfig, args: argparse.Namespace) -> None:
         config.wordlist_path = _WORDLISTS_DIR / f"{code}.txt"
     if args.wordlist is not None:
         config.wordlist_path = args.wordlist
+    if args.hotkey is not None:
+        config.hotkey = args.hotkey.lower()
+    if args.wpm is not None:
+        config.wpm = (args.wpm[0], args.wpm[1])
+    if args.typo is not None:
+        config.typo = args.typo
+    if args.surrender is not None:
+        config.surrender = args.surrender
     if args.turbo:
         config.turbo = True
-        config.typo_enabled = False
+        config.typo = 0.0
 
 
 def load_config(argv: list[str] | None = None) -> BotConfig:
-    """Load configuration: defaults → config.json → CLI args (highest priority)."""
+    """Load configuration: defaults -> config.json -> CLI args (highest priority)."""
     config = BotConfig()
 
     if CONFIG_FILE.exists():

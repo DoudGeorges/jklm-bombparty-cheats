@@ -65,7 +65,7 @@ def _sample_delay(config: BotConfig) -> float:
     if config.turbo:
         return 0.0
 
-    wpm_min, wpm_max = config.typing_wpm_range
+    wpm_min, wpm_max = config.wpm
     mean_wpm = (wpm_min + wpm_max) / 2.0
     std_wpm = (wpm_max - wpm_min) / 4.0
 
@@ -237,10 +237,10 @@ def type_word(
 
         if (
             not turbo
-            and config.typo_enabled
+            and config.typo > 0
             and typo_count < max_typos
             and 0 < i < len(word) - 1
-            and random.random() < config.typo_probability
+            and random.random() < config.typo
         ):
             next_char = word[i + 1] if i + 1 < len(word) - 1 else None
             typo_result = _try_inject_typo(char, next_char, can_continue)

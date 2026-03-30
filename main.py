@@ -103,7 +103,7 @@ class BotRunner:
         self.round_reset_logged = False
         self.last_expired_syllable: str | None = None
 
-        self.toggle_key = _hotkey_str_to_key(config.toggle_hotkey)
+        self.toggle_key = _hotkey_str_to_key(config.hotkey)
         self.user_input_buffer: list[str] = []
 
     def run(self) -> None:
@@ -112,7 +112,7 @@ class BotRunner:
         listener.daemon = True
         listener.start()
 
-        _log(self.msg.press_to_toggle.format(key=self.config.toggle_hotkey.upper()))
+        _log(self.msg.press_to_toggle.format(key=self.config.hotkey.upper()))
 
         try:
             self._main_loop()
@@ -346,7 +346,7 @@ class BotRunner:
         )
         if not self.state.candidate_queue:
             _log(self.msg.no_match.format(syllable=syllable))
-            if random.random() < 0.75:
+            if random.random() < self.config.surrender:
                 try:
                     click_input_field(self.region)
                 except (RuntimeError, ValueError):

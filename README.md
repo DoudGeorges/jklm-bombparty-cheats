@@ -1,73 +1,90 @@
 # JKLM BombParty Bot
 
-An intelligent auto-typer built for the [jklm.fun BombParty](https://jklm.fun/) web game. It uses computer vision and optical character recognition (OCR) to identify active syllables directly from the screen, and then simulates human typing to play the game automatically.
+A bot for [jklm.fun](https://jklm.fun/) BombParty that picks words to earn extra lives, types like a human, and supports multiple languages. Turbo mode strips all delays for unthrottled input.
+
+The game is read through the screen using computer vision and OCR. Answers are typed through OS-level keystrokes. No browser access of any kind.
 
 ## Features
 
-- **Computer Vision OCR**: The bot identifies active syllables by reading the screen natively, utilizing [mss](https://github.com/BoboTiG/python-mss) for ultra-fast screen capture and [EasyOCR](https://github.com/JaidedAI/EasyOCR) for highly precise text recognition.
-- **Dictionary Optimization Engine**: A specialized scoring model selects candidate words. This engine optimizes clearing unused alphabet letters while balancing for acceptable word lengths.
-- **Multilingual Support**: Operations are actively supported across four languages: English, French, German, and Spanish.
-- **Human-Like Character Input**: To simulate a natural typing cadence, the bot introduces variance within configured Words Per Minute (WPM) bounds, calculates keyboard layout transition delays, and organically injects (and auto-corrects) common typographical errors.
-- **Resilient Fallbacks**: If the vocabulary is exhausted mid-turn, the bot autonomously detects the unplayable state and gracefully triggers a lobby "/suicide" command to yield the turn immediately.
-- **Turbo Mode**: An optional, zero-delay configuration that bypasses all simulated timing restraints, forcing keystrokes at the absolute maximum speed permissible by the operating system.
+- **Smart word selection:** Picks words that clear life-letters toward earning extra lives, ranked by letter rarity, clearing efficiency, and syllable position. Priority escalates automatically as fewer life-letters remain.
+- **Human-like typing:** Types within a configurable WPM range with natural timing variations and self-correcting typos.
+- **Multilingual:** Supports English, French, Spanish, and German, each with a dedicated dictionary and a language-specific life-letter set.
+- **Rejection recovery:** When a word is rejected, the next best candidate is submitted immediately without waiting for a new turn.
+- **Screen-native OCR:** The active syllable is read directly from the screen via [EasyOCR](https://github.com/JaidedAI/EasyOCR). No page access required.
+- **Auto-pause:** Pauses when the game window loses focus and resumes when it comes back.
+- **Turbo mode:** Disables all timing simulation. Inputs fire at maximum OS speed.
 
-## Setup Requirements
+## Setup
 
-Python 3.12+ is required. Deploying within a dedicated virtual environment is strongly recommended to cleanly manage the machine-learning and imaging dependencies.
+Python 3.12+ is required. A virtual environment is recommended.
 
-1. Clone the repository and navigate into the directory:
+1. Clone the repository:
    ```bash
    git clone https://github.com/DoudGeorges/jklm-bombparty-cheats.git
    cd jklm-bombparty-cheats
    ```
 
-2. Install dependencies (`uv` is recommended for lightning-fast environment resolution):
+2. Install dependencies:
    ```bash
    uv pip install -r requirements.txt
    ```
 
-Note: The optical character recognition engine utilizes [PyTorch](https://pytorch.org/). If the host machine runs an NVIDIA GPU, verify that the active Python environment is properly configured for CUDA compatibility to minimize CPU overhead.
+> **Note:** EasyOCR requires [PyTorch](https://pytorch.org/). On NVIDIA hardware, CUDA is recommended. CPU inference is noticeably slower.
 
-## Execution
+## Usage
 
-Start the script via the command line interface while the jklm.fun lobby is visible on the primary monitor.
-
-Default execution (English vocabulary):
 ```bash
+# Default (English dictionary)
 python main.py
-```
 
-Execute with a specific language code (fr, de, es):
-```bash
+# Language (fr, es, de)
 python main.py --language fr
-```
 
-Execute with Turbo Mode enabled:
-```bash
+# Custom word list
+python main.py --wordlist path/to/list.txt
+
+# WPM range (default: 100 130)
+python main.py --wpm 80 100
+
+# Typo probability (default: 0.04)
+python main.py --typo 0
+
+# Turbo mode
 python main.py --turbo
+
+# Surrender probability (default: 0.5)
+python main.py --surrender 0.8
 ```
 
-The `F8` key serves as the global toggle. Once switched on, continuous screen analysis begins. As soon as an active game turn is detected, candidate selection and automated typing start immediately.
+Focus the game window, then press `F8` to enable the bot. It will start typing as soon as a turn is detected. Press `F8` again to stop at any time.
 
-## Advanced Configuration
+## Configuration
 
-Internal variables, such as the hardware toggle key, algorithmic WPM bounds, or typo induction probabilities, can be modified by creating a `config.json` file in the root directory:
+Place a `config.json` in the project root to override defaults. CLI flags take precedence over the file.
 
 ```json
 {
   "language": "en",
-  "toggle_hotkey": "f8",
-  "window_title": "jklm.fun",
-  "typing_wpm_range": [100, 130],
-  "typo_enabled": true,
-  "typo_probability": 0.04,
-  "turbo": false
+  "hotkey": "f8",
+  "wpm": [100, 130],
+  "typo": 0.04,
+  "turbo": false,
+  "surrender": 0.5
 }
 ```
 
+| Key | Type | Default | CLI Flag | Description |
+|---|---|---|---|---|
+| `language` | string | `"en"` | `--language` / `-l` | Dictionary language (`en`, `fr`, `es`, `de`) |
+| `hotkey` | string | `"f8"` | `--hotkey` / `-k` | Key that toggles the bot on and off |
+| `wpm` | [int, int] | `[100, 130]` | `--wpm MIN MAX` | Typing speed range in WPM |
+| `typo` | float | `0.04` | `--typo` | Per-keystroke typo probability |
+| `turbo` | bool | `false` | `--turbo` / `-t` | Raw OS-speed input, bypassing `wpm` and `typo` |
+| `surrender` | float | `0.5` | `--surrender` / `-s` | Probability of `/suicide` when no valid word is found |
+
 ## Disclaimer
 
-This source code is provided strictly for educational purposes, dictionary logic analysis, and isolated application testing. All interactions with public lobbies must strictly comply with relevant community guidelines and server terms of service.
+This project is provided for educational purposes. Use in public lobbies must comply with relevant community guidelines and terms of service.
 
 ## License
 
