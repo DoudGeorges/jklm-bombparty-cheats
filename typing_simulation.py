@@ -257,7 +257,7 @@ def type_word(
             delay += _hand_transition_delay(prev_char, char)
             burst_counter += 1
             if burst_counter >= next_burst_at:
-                delay += random.uniform(0.030, 0.110)
+                delay += random.uniform(0.020, 0.070)
                 burst_counter = 0
                 next_burst_at = random.randint(3, 8)
             if not _sleep_with_poll(delay, can_continue):

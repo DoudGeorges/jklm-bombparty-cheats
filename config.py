@@ -23,7 +23,7 @@ class BotConfig:
     language: str = "en"
     wordlist_path: Path = field(default_factory=lambda: _WORDLISTS_DIR / "en.txt")
     hotkey: str = "f8"
-    wpm: tuple[int, int] = (100, 130)
+    wpm: tuple[int, int] = (120, 160)
     typo: float = 0.04
     surrender: float = 0.50
     turbo: bool = False
@@ -80,7 +80,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         metavar=("MIN", "MAX"),
-        help="WPM range for keystroke timing (default: 100 130)",
+        help="WPM range for keystroke timing (default: 120 160)",
     )
     parser.add_argument(
         "--typo",

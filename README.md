@@ -4,6 +4,8 @@ A bot for [jklm.fun](https://jklm.fun/) BombParty that picks words to earn extra
 
 The game is read through the screen using computer vision and OCR. Answers are typed through OS-level keystrokes. No browser access of any kind.
 
+![Demo](demo.gif)
+
 ## Features
 
 - **Smart word selection:** Picks words that clear life-letters toward earning extra lives, ranked by letter rarity, clearing efficiency, and syllable position. Priority escalates automatically as fewer life-letters remain.
@@ -43,7 +45,7 @@ python main.py --language fr
 # Custom word list
 python main.py --wordlist path/to/list.txt
 
-# WPM range (default: 100 130)
+# WPM range (default: 120 160)
 python main.py --wpm 80 100
 
 # Typo probability (default: 0.04)
@@ -66,7 +68,7 @@ Place a `config.json` in the project root to override defaults. CLI flags take p
 {
   "language": "en",
   "hotkey": "f8",
-  "wpm": [100, 130],
+  "wpm": [120, 160],
   "typo": 0.04,
   "turbo": false,
   "surrender": 0.5
@@ -77,7 +79,7 @@ Place a `config.json` in the project root to override defaults. CLI flags take p
 |---|---|---|---|---|
 | `language` | string | `"en"` | `--language` / `-l` | Dictionary language (`en`, `fr`, `es`, `de`) |
 | `hotkey` | string | `"f8"` | `--hotkey` / `-k` | Key that toggles the bot on and off |
-| `wpm` | [int, int] | `[100, 130]` | `--wpm MIN MAX` | Typing speed range in WPM |
+| `wpm` | [int, int] | `[120, 160]` | `--wpm MIN MAX` | Typing speed range in WPM |
 | `typo` | float | `0.04` | `--typo` | Per-keystroke typo probability |
 | `turbo` | bool | `false` | `--turbo` / `-t` | Raw OS-speed input, bypassing `wpm` and `typo` |
 | `surrender` | float | `0.5` | `--surrender` / `-s` | Probability of `/suicide` when no valid word is found |
